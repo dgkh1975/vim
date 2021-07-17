@@ -345,7 +345,8 @@ prop_add_common(
     }
 
     buf->b_has_textprop = TRUE;  // this is never reset
-    redraw_buf_later(buf, NOT_VALID);
+    changed_lines_buf(buf, start_lnum, end_lnum + 1, 0);
+    redraw_buf_later(buf, VALID);
 }
 
 /*
@@ -535,6 +536,7 @@ f_prop_clear(typval_T *argvars, typval_T *rettv UNUSED)
     linenr_T end = start;
     linenr_T lnum;
     buf_T    *buf = curbuf;
+    int	    did_clear = FALSE;
 
     if (argvars[1].v_type != VAR_UNKNOWN)
     {
@@ -547,7 +549,7 @@ f_prop_clear(typval_T *argvars, typval_T *rettv UNUSED)
     }
     if (start < 1 || end < 1)
     {
-	emsg(_(e_invrange));
+	emsg(_(e_invalid_range));
 	return;
     }
 
@@ -562,6 +564,7 @@ f_prop_clear(typval_T *argvars, typval_T *rettv UNUSED)
 	len = STRLEN(text) + 1;
 	if ((size_t)buf->b_ml.ml_line_len > len)
 	{
+	    did_clear = TRUE;
 	    if (!(buf->b_ml.ml_flags & ML_LINE_DIRTY))
 	    {
 		char_u *newtext = vim_strsave(text);
@@ -575,7 +578,8 @@ f_prop_clear(typval_T *argvars, typval_T *rettv UNUSED)
 	    buf->b_ml.ml_line_len = (int)len;
 	}
     }
-    redraw_buf_later(buf, NOT_VALID);
+    if (did_clear)
+	redraw_buf_later(buf, NOT_VALID);
 }
 
 /*
@@ -597,10 +601,11 @@ f_prop_find(typval_T *argvars, typval_T *rettv)
     int		lnum = -1;
     int		col = -1;
     int		dir = 1;    // 1 = forward, -1 = backward
+    int		both;
 
     if (argvars[0].v_type != VAR_DICT || argvars[0].vval.v_dict == NULL)
     {
-	emsg(_(e_invarg));
+	emsg(_(e_dictreq));
 	return;
     }
     dict = argvars[0].vval.v_dict;
@@ -641,7 +646,7 @@ f_prop_find(typval_T *argvars, typval_T *rettv)
 
     if (lnum < 1 || lnum > buf->b_ml.ml_line_count)
     {
-	emsg(_(e_invrange));
+	emsg(_(e_invalid_range));
 	return;
     }
 
@@ -658,9 +663,15 @@ f_prop_find(typval_T *argvars, typval_T *rettv)
 	    return;
 	type_id = type->pt_id;
     }
+    both = dict_get_bool(dict, (char_u *)"both", FALSE);
     if (id == -1 && type_id == -1)
     {
 	emsg(_("E968: Need at least one of 'id' or 'type'"));
+	return;
+    }
+    if (both && (id == -1 || type_id == -1))
+    {
+	emsg(_("E860: Need 'id' and 'type' with 'both'"));
 	return;
     }
 
@@ -695,7 +706,8 @@ f_prop_find(typval_T *argvars, typval_T *rettv)
 		else if (prop.tp_col + prop.tp_len - (prop.tp_len != 0) < col)
 		    continue;
 	    }
-	    if (prop.tp_id == id || prop.tp_type == type_id)
+	    if (both ? prop.tp_id == id && prop.tp_type == type_id
+		     : prop.tp_id == id || prop.tp_type == type_id)
 	    {
 		// Check if the starting position has text props.
 		if (lnum_start == lnum
@@ -757,9 +769,16 @@ f_prop_find(typval_T *argvars, typval_T *rettv)
     void
 f_prop_list(typval_T *argvars, typval_T *rettv)
 {
-    linenr_T lnum = tv_get_number(&argvars[0]);
+    linenr_T lnum;
     buf_T    *buf = curbuf;
 
+    if (in_vim9script()
+	    && (check_for_number_arg(argvars, 0) == FAIL
+		|| (argvars[1].v_type != VAR_UNKNOWN &&
+		    check_for_dict_arg(argvars, 1) == FAIL)))
+	return;
+
+    lnum = tv_get_number(&argvars[0]);
     if (argvars[1].v_type != VAR_UNKNOWN)
     {
 	if (get_bufnr_from_arg(&argvars[1], &buf) == FAIL)
@@ -767,7 +786,7 @@ f_prop_list(typval_T *argvars, typval_T *rettv)
     }
     if (lnum < 1 || lnum > buf->b_ml.ml_line_count)
     {
-	emsg(_(e_invrange));
+	emsg(_(e_invalid_range));
 	return;
     }
 
@@ -803,6 +822,8 @@ f_prop_remove(typval_T *argvars, typval_T *rettv)
     linenr_T	start = 1;
     linenr_T	end = 0;
     linenr_T	lnum;
+    linenr_T	first_changed = 0;
+    linenr_T	last_changed = 0;
     dict_T	*dict;
     buf_T	*buf = curbuf;
     int		do_all;
@@ -825,7 +846,7 @@ f_prop_remove(typval_T *argvars, typval_T *rettv)
 	    end = tv_get_number(&argvars[2]);
 	if (start < 1 || end < 1)
 	{
-	    emsg(_(e_invrange));
+	    emsg(_(e_invalid_range));
 	    return;
 	}
     }
@@ -913,6 +934,9 @@ f_prop_remove(typval_T *argvars, typval_T *rettv)
 		    buf->b_ml.ml_line_len -= sizeof(textprop_T);
 		    --idx;
 
+		    if (first_changed == 0)
+			first_changed = lnum;
+		    last_changed = lnum;
 		    ++rettv->vval.v_number;
 		    if (!do_all)
 			break;
@@ -920,7 +944,11 @@ f_prop_remove(typval_T *argvars, typval_T *rettv)
 	    }
 	}
     }
-    redraw_buf_later(buf, NOT_VALID);
+    if (first_changed > 0)
+    {
+	changed_lines_buf(buf, first_changed, last_changed + 1, 0);
+	redraw_buf_later(buf, VALID);
+    }
 }
 
 /*

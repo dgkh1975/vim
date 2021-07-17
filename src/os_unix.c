@@ -783,7 +783,7 @@ mch_stackcheck(char *p)
  * completely full.
  */
 
-#ifndef SIGSTKSZ
+#if !defined SIGSTKSZ && !defined(HAVE_SYSCONF_SIGSTKSZ)
 # define SIGSTKSZ 8000    // just a guess of how much stack is needed...
 #endif
 
@@ -806,13 +806,21 @@ init_signal_stack(void)
 #  else
 	sigstk.ss_sp = signal_stack;
 #  endif
+#  ifdef HAVE_SYSCONF_SIGSTKSZ
+	sigstk.ss_size = sysconf(_SC_SIGSTKSZ);
+#  else
 	sigstk.ss_size = SIGSTKSZ;
+#  endif
 	sigstk.ss_flags = 0;
 	(void)sigaltstack(&sigstk, NULL);
 # else
 	sigstk.ss_sp = signal_stack;
 	if (stack_grows_downwards)
+#  ifdef HAVE_SYSCONF_SIGSTKSZ
+	    sigstk.ss_sp += sysconf(_SC_SIGSTKSZ) - 1;
+#  else
 	    sigstk.ss_sp += SIGSTKSZ - 1;
+#  endif
 	sigstk.ss_onstack = 0;
 	(void)sigstack(&sigstk, NULL);
 # endif
@@ -2478,8 +2486,17 @@ mch_get_pid(void)
     int
 mch_process_running(long pid)
 {
-    // EMX kill() not working correctly, it seems
-    return kill(pid, 0) == 0;
+    // If there is no error the process must be running.
+    if (kill(pid, 0) == 0)
+	return TRUE;
+#ifdef ESRCH
+    // If the error is ESRCH then the process is not running.
+    if (errno == ESRCH)
+	return FALSE;
+#endif
+    // If the process is running and owned by another user we get EPERM.  With
+    // other errors the process might be running, assuming it is then.
+    return TRUE;
 }
 
 #if !defined(HAVE_STRERROR) && defined(USE_GETCWD)
@@ -3261,7 +3278,11 @@ mch_early_init(void)
      * Ignore any errors.
      */
 #if defined(HAVE_SIGALTSTACK) || defined(HAVE_SIGSTACK)
+# ifdef HAVE_SYSCONF_SIGSTKSZ
+    signal_stack = alloc(sysconf(_SC_SIGSTKSZ));
+# else
     signal_stack = alloc(SIGSTKSZ);
+# endif
     init_signal_stack();
 #endif
 }
@@ -3331,7 +3352,7 @@ exit_scroll(void)
 	else
 	    out_char('\n');
     }
-    else
+    else if (!is_not_a_term())
     {
 	restore_cterm_colors();		// get original colors back
 	msg_clr_eos_force();		// clear the rest of the display
@@ -3358,9 +3379,12 @@ mch_exit(int r)
     {
 	settmode(TMODE_COOK);
 #ifdef FEAT_TITLE
-	// restore xterm title and icon name
-	mch_restore_title(SAVE_RESTORE_BOTH);
-	term_pop_title(SAVE_RESTORE_BOTH);
+	if (!is_not_a_term())
+	{
+	    // restore xterm title and icon name
+	    mch_restore_title(SAVE_RESTORE_BOTH);
+	    term_pop_title(SAVE_RESTORE_BOTH);
+	}
 #endif
 	/*
 	 * When t_ti is not empty but it doesn't cause swapping terminal
@@ -4760,11 +4784,6 @@ mch_call_shell_fork(
 		    // push stream discipline modules
 		    if (options & SHELL_COOKED)
 			setup_slavepty(pty_slave_fd);
-#  ifdef TIOCSCTTY
-		    // Try to become controlling tty (probably doesn't work,
-		    // unless run by root)
-		    ioctl(pty_slave_fd, TIOCSCTTY, (char *)NULL);
-#  endif
 		}
 # endif
 		set_default_child_environment(FALSE);

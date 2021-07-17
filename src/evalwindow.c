@@ -363,7 +363,7 @@ get_winnr(tabpage_T *tp, typval_T *argvar)
 
 	if (invalid_arg)
 	{
-	    semsg(_(e_invexpr2), arg);
+	    semsg(_(e_invalid_expression_str), arg);
 	    nr = 0;
 	}
     }
@@ -636,7 +636,7 @@ f_tabpagenr(typval_T *argvars UNUSED, typval_T *rettv)
 		nr = valid_tabpage(lastused_tabpage) ?
 					tabpage_index(lastused_tabpage) : 0;
 	    else
-		semsg(_(e_invexpr2), arg);
+		semsg(_(e_invalid_expression_str), arg);
 	}
     }
     else
@@ -652,6 +652,12 @@ f_tabpagewinnr(typval_T *argvars UNUSED, typval_T *rettv)
 {
     int		nr = 1;
     tabpage_T	*tp;
+
+    if (in_vim9script()
+	    && (check_for_number_arg(argvars, 0) == FAIL
+		|| (argvars[1].v_type != VAR_UNKNOWN
+		    && check_for_string_arg(argvars, 1) == FAIL)))
+	return;
 
     tp = find_tabpage((int)tv_get_number(&argvars[0]));
     if (tp == NULL)
@@ -726,7 +732,7 @@ f_win_gotoid(typval_T *argvars, typval_T *rettv)
 #ifdef FEAT_CMDWIN
     if (cmdwin_type != 0)
     {
-	emsg(_(e_cmdwin));
+	emsg(_(e_invalid_in_cmdline_window));
 	return;
     }
 #endif
@@ -1007,18 +1013,25 @@ f_winnr(typval_T *argvars UNUSED, typval_T *rettv)
 f_winrestcmd(typval_T *argvars UNUSED, typval_T *rettv)
 {
     win_T	*wp;
-    int		winnr = 1;
+    int		i;
+    int		winnr;
     garray_T	ga;
     char_u	buf[50];
 
     ga_init2(&ga, (int)sizeof(char), 70);
-    FOR_ALL_WINDOWS(wp)
+
+    // Do this twice to handle some window layouts properly.
+    for (i = 0; i < 2; ++i)
     {
-	sprintf((char *)buf, ":%dresize %d|", winnr, wp->w_height);
-	ga_concat(&ga, buf);
-	sprintf((char *)buf, "vert :%dresize %d|", winnr, wp->w_width);
-	ga_concat(&ga, buf);
-	++winnr;
+	winnr = 1;
+	FOR_ALL_WINDOWS(wp)
+	{
+	    sprintf((char *)buf, ":%dresize %d|", winnr, wp->w_height);
+	    ga_concat(&ga, buf);
+	    sprintf((char *)buf, "vert :%dresize %d|", winnr, wp->w_width);
+	    ga_concat(&ga, buf);
+	    ++winnr;
+	}
     }
     ga_append(&ga, NUL);
 

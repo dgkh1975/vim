@@ -98,7 +98,7 @@ get_history_arg(expand_T *xp UNUSED, int idx)
     static char_u compl[2] = { NUL, NUL };
     char *short_names = ":=@>?/";
     int short_names_count = (int)STRLEN(short_names);
-    int history_name_count = sizeof(history_names) / sizeof(char *) - 1;
+    int history_name_count = ARRAY_LENGTH(history_names) - 1;
 
     if (idx < short_names_count)
     {
@@ -596,6 +596,12 @@ f_histget(typval_T *argvars UNUSED, typval_T *rettv)
     int		type;
     int		idx;
     char_u	*str;
+
+    if (in_vim9script()
+	    && (check_for_string_arg(argvars, 0) == FAIL
+		|| (argvars[1].v_type != VAR_UNKNOWN
+		    && check_for_number_arg(argvars, 1) == FAIL)))
+	return;
 
     str = tv_get_string_chk(&argvars[0]);	// NULL on type error
     if (str == NULL)

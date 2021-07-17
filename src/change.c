@@ -563,9 +563,12 @@ changed_common(
 		changed_cline_bef_curs_win(wp);
 	    if (wp->w_botline >= lnum)
 	    {
-		// Assume that botline doesn't change (inserted lines make
-		// other lines scroll down below botline).
-		approximate_botline_win(wp);
+		if (xtra < 0)
+		    invalidate_botline_win(wp);
+		else
+		    // Assume that botline doesn't change (inserted lines make
+		    // other lines scroll down below botline).
+		    approximate_botline_win(wp);
 	    }
 
 	    // Check if any w_lines[] entries have become invalid.
@@ -758,7 +761,7 @@ deleted_lines_mark(linenr_T lnum, long count)
 /*
  * Marks the area to be redrawn after a change.
  */
-    static void
+    void
 changed_lines_buf(
     buf_T	*buf,
     linenr_T	lnum,	    // first line with change

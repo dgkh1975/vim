@@ -61,7 +61,7 @@ popup_options_one(dict_T *dict, char_u *key)
 	    n = strtol((char *)s, (char **)&endp, 10);
 	if (endp != NULL && *skipwhite(endp) != NUL)
 	{
-	    semsg(_(e_invexpr2), val);
+	    semsg(_(e_invalid_expression_str), val);
 	    return 0;
 	}
     }
@@ -402,8 +402,7 @@ get_pos_entry(dict_T *d, int give_error)
     if (str == NULL)
 	return POPPOS_NONE;
 
-    for (nr = 0; nr < (int)(sizeof(poppos_entries) / sizeof(poppos_entry_T));
-									  ++nr)
+    for (nr = 0; nr < (int)ARRAY_LENGTH(poppos_entries); ++nr)
 	if (STRCMP(str, poppos_entries[nr].pp_name) == 0)
 	    return poppos_entries[nr].pp_val;
 
@@ -873,18 +872,13 @@ apply_general_options(win_T *wp, dict_T *dict)
 	handle_moved_argument(wp, di, TRUE);
     }
 
-    di = dict_find(dict, (char_u *)"cursorline", -1);
-    if (di != NULL)
+    nr = dict_get_bool(dict, (char_u *)"cursorline", -1);
+    if (nr != -1)
     {
-	if (di->di_tv.v_type == VAR_NUMBER)
-	{
-	    if (di->di_tv.vval.v_number != 0)
-		wp->w_popup_flags |= POPF_CURSORLINE;
-	    else
-		wp->w_popup_flags &= ~POPF_CURSORLINE;
-	}
+	if (nr != 0)
+	    wp->w_popup_flags |= POPF_CURSORLINE;
 	else
-	    semsg(_(e_invargval), "cursorline");
+	    wp->w_popup_flags &= ~POPF_CURSORLINE;
     }
 
     di = dict_find(dict, (char_u *)"filter", -1);
@@ -2365,13 +2359,21 @@ filter_handle_drag(win_T *wp, int c, typval_T *rettv)
     void
 f_popup_filter_menu(typval_T *argvars, typval_T *rettv)
 {
-    int		id = tv_get_number(&argvars[0]);
-    win_T	*wp = win_id2wp(id);
-    char_u	*key = tv_get_string(&argvars[1]);
+    int		id;
+    win_T	*wp;
+    char_u	*key;
     typval_T	res;
     int		c;
     linenr_T	old_lnum;
 
+    if (in_vim9script()
+	    && (check_for_number_arg(argvars, 0) == FAIL
+		|| check_for_string_arg(argvars, 1) == FAIL))
+	return;
+
+    id = tv_get_number(&argvars[0]);
+    wp = win_id2wp(id);
+    key = tv_get_string(&argvars[1]);
     // If the popup has been closed do not consume the key.
     if (wp == NULL)
 	return;
@@ -2422,12 +2424,20 @@ f_popup_filter_menu(typval_T *argvars, typval_T *rettv)
     void
 f_popup_filter_yesno(typval_T *argvars, typval_T *rettv)
 {
-    int		id = tv_get_number(&argvars[0]);
-    win_T	*wp = win_id2wp(id);
-    char_u	*key = tv_get_string(&argvars[1]);
+    int		id;
+    win_T	*wp;
+    char_u	*key;
     typval_T	res;
     int		c;
 
+    if (in_vim9script()
+	    && (check_for_number_arg(argvars, 0) == FAIL
+		|| check_for_string_arg(argvars, 1) == FAIL))
+	return;
+
+    id = tv_get_number(&argvars[0]);
+    wp = win_id2wp(id);
+    key = tv_get_string(&argvars[1]);
     // If the popup has been closed don't consume the key.
     if (wp == NULL)
 	return;
@@ -2733,9 +2743,16 @@ close_all_popups(int force)
 f_popup_move(typval_T *argvars, typval_T *rettv UNUSED)
 {
     dict_T	*dict;
-    int		id = (int)tv_get_number(argvars);
-    win_T	*wp = find_popup_win(id);
+    int		id;
+    win_T	*wp;
 
+    if (in_vim9script()
+	    && (check_for_number_arg(argvars, 0) == FAIL
+		|| check_for_dict_arg(argvars, 1) == FAIL))
+	return;
+
+    id = (int)tv_get_number(argvars);
+    wp = find_popup_win(id);
     if (wp == NULL)
 	return;  // invalid {id}
 
@@ -2760,10 +2777,17 @@ f_popup_move(typval_T *argvars, typval_T *rettv UNUSED)
 f_popup_setoptions(typval_T *argvars, typval_T *rettv UNUSED)
 {
     dict_T	*dict;
-    int		id = (int)tv_get_number(argvars);
-    win_T	*wp = find_popup_win(id);
+    int		id;
+    win_T	*wp;
     linenr_T	old_firstline;
 
+    if (in_vim9script()
+	    && (check_for_number_arg(argvars, 0) == FAIL
+		|| check_for_dict_arg(argvars, 1) == FAIL))
+	return;
+
+    id = (int)tv_get_number(argvars);
+    wp = find_popup_win(id);
     if (wp == NULL)
 	return;  // invalid {id}
 
@@ -3047,8 +3071,7 @@ f_popup_getoptions(typval_T *argvars, typval_T *rettv)
 	if (wp->w_close_cb.cb_name != NULL)
 	    dict_add_callback(dict, "callback", &wp->w_close_cb);
 
-	for (i = 0; i < (int)(sizeof(poppos_entries) / sizeof(poppos_entry_T));
-									   ++i)
+	for (i = 0; i < (int)ARRAY_LENGTH(poppos_entries); ++i)
 	    if (wp->w_popup_pos == poppos_entries[i].pp_val)
 	    {
 		dict_add_string(dict, "pos",
@@ -3827,17 +3850,29 @@ update_popups(void (*win_update)(win_T *wp))
 	title_wincol = wp->w_wincol + 1;
 	if (wp->w_popup_title != NULL)
 	{
-	    char_u  *title_text;
+	    title_len = (int)MB_CHARLEN(wp->w_popup_title);
 
-	    title_len = (int)STRLEN(wp->w_popup_title);
-	    title_text = alloc(title_len + 1);
-	    trunc_string(wp->w_popup_title, title_text,
-					       total_width - 2, title_len + 1);
-	    screen_puts(title_text, wp->w_winrow, title_wincol,
-		      wp->w_popup_border[0] > 0 ? border_attr[0] : popup_attr);
-	    vim_free(title_text);
+	    // truncate the title if too long
 	    if (title_len > total_width - 2)
+	    {
+		int	title_byte_len = (int)STRLEN(wp->w_popup_title);
+		char_u  *title_text = alloc(title_byte_len + 1);
+
+		if (title_text != NULL)
+		{
+		    trunc_string(wp->w_popup_title, title_text,
+					  total_width - 2, title_byte_len + 1);
+		    screen_puts(title_text, wp->w_winrow, title_wincol,
+				  wp->w_popup_border[0] > 0
+						? border_attr[0] : popup_attr);
+		    vim_free(title_text);
+		}
+
 		title_len = total_width - 2;
+	    }
+	    else
+		screen_puts(wp->w_popup_title, wp->w_winrow, title_wincol,
+		      wp->w_popup_border[0] > 0 ? border_attr[0] : popup_attr);
 	}
 
 	wincol = wp->w_wincol - wp->w_popup_leftoff;

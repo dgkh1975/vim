@@ -1,6 +1,8 @@
 " Tests for 'listchars' display with 'list' and :list
 
+source check.vim
 source view_util.vim
+source screendump.vim
 
 func Test_listchars()
   enew!
@@ -146,7 +148,7 @@ func Test_listchars()
   set list
   " Non-breaking space
   let nbsp = nr2char(0xa0)
-  call append(0, [ ">".nbsp."<" ])
+  call append(0, [ ">" .. nbsp .. "<" ])
 
   let expected = '>X< '
 
@@ -193,12 +195,8 @@ func Test_listchars_unicode()
   set list
 
   let nbsp = nr2char(0xa0)
-  call append(0, [
-        \ "a\tb c".nbsp."d"
-        \ ])
-  let expected = [
-        \ 'a←↔↔↔↔↔→b␣c≠d⇔'
-        \ ]
+  call append(0, ["a\tb c" .. nbsp .. "d"])
+  let expected = ['a←↔↔↔↔↔→b␣c≠d⇔']
   redraw!
   call cursor(1, 1)
   call assert_equal(expected, ScreenLines(1, virtcol('$')))
@@ -221,10 +219,10 @@ func Test_listchars_composing()
   let nbsp1 = nr2char(0xa0)
   let nbsp2 = nr2char(0x202f)
   call append(0, [
-        \ "  \u3099\t \u309A".nbsp1.nbsp1."\u0302".nbsp2.nbsp2."\u0302",
+        \ "  \u3099\t \u309A" .. nbsp1 .. nbsp1 .. "\u0302" .. nbsp2 .. nbsp2 .. "\u0302",
         \ ])
   let expected = [
-        \ "_ \u3099^I \u309A=".nbsp1."\u0302=".nbsp2."\u0302$"
+        \ "_ \u3099^I \u309A=" .. nbsp1 .. "\u0302=" .. nbsp2 .. "\u0302$"
         \ ]
   redraw!
   call cursor(1, 1)
@@ -359,5 +357,41 @@ func Test_listchars_window_local()
   %bw!
   set list& listchars&
 endfunc
+
+func Test_listchars_foldcolumn()
+  CheckScreendump
+
+  let lines =<< trim END
+      call setline(1, ['aaa', '', 'a', 'aaaaaa'])
+      vsplit
+      vsplit
+      windo set signcolumn=yes foldcolumn=1 winminwidth=0 nowrap list listchars=extends:>,precedes:<
+  END
+  call writefile(lines, 'XTest_listchars')
+
+  let buf = RunVimInTerminal('-S XTest_listchars', {'rows': 10, 'cols': 60})
+
+  call term_sendkeys(buf, "13\<C-W>>")
+  call VerifyScreenDump(buf, 'Test_listchars_01', {})
+  call term_sendkeys(buf, "\<C-W>>")
+  call VerifyScreenDump(buf, 'Test_listchars_02', {})
+  call term_sendkeys(buf, "\<C-W>>")
+  call VerifyScreenDump(buf, 'Test_listchars_03', {})
+  call term_sendkeys(buf, "\<C-W>>")
+  call VerifyScreenDump(buf, 'Test_listchars_04', {})
+  call term_sendkeys(buf, "\<C-W>>")
+  call VerifyScreenDump(buf, 'Test_listchars_05', {})
+  call term_sendkeys(buf, "\<C-W>h")
+  call term_sendkeys(buf, ":set nowrap foldcolumn=4\<CR>")
+  call term_sendkeys(buf, "15\<C-W><")
+  call VerifyScreenDump(buf, 'Test_listchars_06', {})
+  call term_sendkeys(buf, "4\<C-W><")
+  call VerifyScreenDump(buf, 'Test_listchars_07', {})
+
+  " clean up
+  call StopVimInTerminal(buf)
+  call delete('XTest_listchars')
+endfunc
+
 
 " vim: shiftwidth=2 sts=2 expandtab

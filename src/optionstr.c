@@ -24,7 +24,11 @@ static char *(p_bo_values[]) = {"all", "backspace", "cursor", "complete",
 static char *(p_nf_values[]) = {"bin", "octal", "hex", "alpha", "unsigned", NULL};
 static char *(p_ff_values[]) = {FF_UNIX, FF_DOS, FF_MAC, NULL};
 #ifdef FEAT_CRYPT
-static char *(p_cm_values[]) = {"zip", "blowfish", "blowfish2", NULL};
+static char *(p_cm_values[]) = {"zip", "blowfish", "blowfish2",
+ # ifdef FEAT_SODIUM
+    "xchacha20",
+ # endif
+    NULL};
 #endif
 static char *(p_cmp_values[]) = {"internal", "keepascii", NULL};
 static char *(p_dy_values[]) = {"lastline", "truncate", "uhex", NULL};
@@ -34,10 +38,11 @@ static char *(p_fdo_values[]) = {"all", "block", "hor", "mark", "percent",
 				 "undo", "jump", NULL};
 #endif
 #ifdef FEAT_SESSION
-// Also used for 'viewoptions'!
+// Also used for 'viewoptions'!  Keep in sync with SSOP_ flags.
 static char *(p_ssop_values[]) = {"buffers", "winpos", "resize", "winsize",
     "localoptions", "options", "help", "blank", "globals", "slash", "unix",
-    "sesdir", "curdir", "folds", "cursor", "tabpages", "terminal", NULL};
+    "sesdir", "curdir", "folds", "cursor", "tabpages", "terminal", "skiprtp",
+    NULL};
 #endif
 // Keep in sync with SWB_ flags in option.h
 static char *(p_swb_values[]) = {"useopen", "usetab", "split", "newtab", "vsplit", "uselast", NULL};
@@ -617,8 +622,10 @@ check_stl_option(char_u *s)
 	}
 	if (*s == '{')
 	{
+	    int reevaluate = (*s == '%');
+
 	    s++;
-	    while (*s != '}' && *s)
+	    while ((*s != '}' || (reevaluate && s[-1] != '%')) && *s)
 		s++;
 	    if (*s != '}')
 		return N_("E540: Unclosed expression sequence");
@@ -907,6 +914,9 @@ ambw_end:
 		init_highlight(FALSE, FALSE);
 	    }
 #endif
+#ifdef FEAT_TERMINAL
+	    term_update_colors_all();
+#endif
 	}
 	else
 	    errmsg = e_invarg;
@@ -961,7 +971,7 @@ ambw_end:
 	if (gvarp == &p_fenc)
 	{
 	    if (!curbuf->b_p_ma && opt_flags != OPT_GLOBAL)
-		errmsg = e_modifiable;
+		errmsg = e_cannot_make_changes_modifiable_is_off;
 	    else if (vim_strchr(*varp, ',') != NULL)
 		// No comma allowed in 'fileencoding'; catches confusing it
 		// with 'fileencodings'.
@@ -1120,7 +1130,7 @@ ambw_end:
     else if (gvarp == &p_ff)
     {
 	if (!curbuf->b_p_ma && !(opt_flags & OPT_GLOBAL))
-	    errmsg = e_modifiable;
+	    errmsg = e_cannot_make_changes_modifiable_is_off;
 	else if (check_opt_strings(*varp, p_ff_values, FALSE) != OK)
 	    errmsg = e_invarg;
 	else
@@ -2175,7 +2185,7 @@ ambw_end:
     else if (varp == &curwin->w_p_wcr)
     {
 	if (curwin->w_buffer->b_term != NULL)
-	    term_update_colors();
+	    term_update_colors(curwin->w_buffer->b_term);
     }
 # if defined(MSWIN)
     // 'termwintype'
@@ -2461,11 +2471,14 @@ ambw_end:
 		   && (get_option_flags(opt_idx) & (P_CURSWANT | P_RALL)) != 0)
 	curwin->w_set_curswant = TRUE;
 
+    if ((opt_flags & OPT_NO_REDRAW) == 0)
+    {
 #ifdef FEAT_GUI
-    // check redraw when it's not a GUI option or the GUI is active.
-    if (!redraw_gui_only || gui.in_use)
+	// check redraw when it's not a GUI option or the GUI is active.
+	if (!redraw_gui_only || gui.in_use)
 #endif
-	check_redraw(get_option_flags(opt_idx));
+	    check_redraw(get_option_flags(opt_idx));
+    }
 
 #if defined(FEAT_VTP) && defined(FEAT_TERMGUICOLORS)
     if (did_swaptcap)

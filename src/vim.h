@@ -46,9 +46,6 @@
 #  endif
 # endif
 
-// for INT_MAX, LONG_MAX et al.
-# include <limits.h>
-
 /*
  * Cygwin may have fchdir() in a newer release, but in most versions it
  * doesn't work well and avoiding it keeps the binary backward compatible.
@@ -61,6 +58,9 @@
 // identifier causes conflicts.  Therefore use UINT32_T.
 # define UINT32_TYPEDEF uint32_t
 #endif
+
+// for INT_MAX, LONG_MAX et al.
+#include <limits.h>
 
 #if !defined(UINT32_TYPEDEF)
 # if defined(uint32_t)  // this doesn't catch typedefs, unfortunately
@@ -777,6 +777,7 @@ extern int (*dyn_libintl_wputenv)(const wchar_t *envstring);
 #define EXPAND_MAPCLEAR		47
 #define EXPAND_ARGLIST		48
 #define EXPAND_DIFF_BUFFERS	49
+#define EXPAND_DISASSEMBLE	50
 
 // Values for exmode_active (0 is no exmode)
 #define EXMODE_NORMAL		1
@@ -994,6 +995,10 @@ extern int (*dyn_libintl_wputenv)(const wchar_t *envstring);
 #define DOBUF_LAST	2	// "count" buffer from last buffer
 #define DOBUF_MOD	3	// "count" mod. buffer from current buffer
 
+// Values for flags argument of do_buffer()
+#define DOBUF_FORCEIT	1	// :cmd!
+#define DOBUF_NOPOPUP	2	// skip popup window buffers
+
 // Values for sub_cmd and which_pat argument for search_regcomp()
 // Also used for which_pat argument for searchit()
 #define RE_SEARCH	0	// save/use pat in/from search_pattern
@@ -1068,6 +1073,7 @@ extern int (*dyn_libintl_wputenv)(const wchar_t *envstring);
 #define PUT_LINE	8	// put register as lines
 #define PUT_LINE_SPLIT	16	// split line for linewise register
 #define PUT_LINE_FORWARD 32	// put linewise register below Visual sel.
+#define PUT_BLOCK_INNER 64      // in block mode, do not add trailing spaces
 
 // flags for set_indent()
 #define SIN_CHANGED	1	// call changed_bytes() when line changed
@@ -1200,6 +1206,8 @@ extern int (*dyn_libintl_wputenv)(const wchar_t *envstring);
 #define OPT_WINONLY	0x10	// only set window-local options
 #define OPT_NOWIN	0x20	// don't set window-local options
 #define OPT_ONECOLUMN	0x40	// list options one per line
+#define OPT_NO_REDRAW	0x80	// ignore redraw flags on option
+#define OPT_SKIPRTP	0x100	// "skiprtp" in 'sessionoptions'
 
 // Magic chars used in confirm dialog strings
 #define DLG_BUTTON_SEP	'\n'
@@ -1787,10 +1795,18 @@ typedef struct timeval proftime_T;
 typedef int proftime_T;	    // dummy for function prototypes
 #endif
 
+// Type of compilation passed to compile_def_function()
+typedef enum {
+    CT_NONE,	    // use df_instr
+    CT_PROFILE,	    // use df_instr_prof
+    CT_DEBUG	    // use df_instr_debug, overrules CT_PROFILE
+} compiletype_T;
+
+// Keep in sync with INSTRUCTIONS().
 #ifdef FEAT_PROFILE
-# define PROFILING(ufunc) (do_profiling == PROF_YES && (ufunc)->uf_profiling)
+# define COMPILE_TYPE(ufunc) (debug_break_level > 0 || ufunc->uf_has_breakpoint ? CT_DEBUG : do_profiling == PROF_YES && (ufunc)->uf_profiling ? CT_PROFILE : CT_NONE)
 #else
-# define PROFILING(ufunc) FALSE
+# define COMPILE_TYPE(ufunc) debug_break_level > 0 || ufunc->uf_has_breakpoint ? CT_DEBUG : CT_NONE
 #endif
 
 /*
@@ -1855,6 +1871,8 @@ typedef int sock_T;
 
 #define MOUSE_6	0x500	// scroll wheel left
 #define MOUSE_7	0x600	// scroll wheel right
+
+#define MOUSE_MOVE 0x700    // report mouse moved
 
 // 0x20 is reserved by xterm
 #define MOUSE_DRAG_XTERM   0x40
@@ -2028,6 +2046,7 @@ typedef int sock_T;
 #define VAR_TYPE_JOB	    8
 #define VAR_TYPE_CHANNEL    9
 #define VAR_TYPE_BLOB	    10
+#define VAR_TYPE_INSTR	    11
 
 #define DICT_MAXNEST 100	// maximum nesting of lists and dicts
 
@@ -2151,10 +2170,13 @@ typedef enum {
 } estack_arg_T;
 
 // Flags for assignment functions.
-#define ASSIGN_FINAL	1   // ":final"
-#define ASSIGN_CONST	2   // ":const"
-#define ASSIGN_NO_DECL	4   // "name = expr" without ":let"/":const"/":final"
-#define ASSIGN_DECL	8   // may declare variable if it does not exist
+#define ASSIGN_FINAL	0x01  // ":final"
+#define ASSIGN_CONST	0x02  // ":const"
+#define ASSIGN_NO_DECL	0x04  // "name = expr" without ":let"/":const"/":final"
+#define ASSIGN_DECL	0x08  // may declare variable if it does not exist
+#define ASSIGN_UNPACK	0x10  // using [a, b] = list
+#define ASSIGN_NO_MEMBER_TYPE 0x20 // use "any" for list and dict member type
+#define ASSIGN_FOR_LOOP 0x40 // assigning to loop variable
 
 #include "ex_cmds.h"	    // Ex command defines
 #include "spell.h"	    // spell checking stuff
@@ -2452,6 +2474,7 @@ typedef enum {
 // flags for skip_vimgrep_pat()
 #define VGR_GLOBAL	1
 #define VGR_NOJUMP	2
+#define VGR_FUZZY	4
 
 // behavior for bad character, "++bad=" argument
 #define BAD_REPLACE	'?'	// replace it with '?' (default)
@@ -2700,5 +2723,13 @@ long elapsed(DWORD start_tick);
 // Flags for mch_delay.
 #define MCH_DELAY_IGNOREINPUT	1
 #define MCH_DELAY_SETTMODE	2
+
+// Flags for eval_variable().
+#define EVAL_VAR_VERBOSE	1   // may give error message
+#define EVAL_VAR_NOAUTOLOAD	2   // do not use script autoloading
+#define EVAL_VAR_IMPORT		4   // may return special variable for import
+
+// Maximum number of characters that can be fuzzy matched
+#define MAX_FUZZY_MATCHES	256
 
 #endif // VIM__H

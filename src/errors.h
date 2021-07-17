@@ -10,6 +10,44 @@
  * Definition of error messages, sorted on error number.
  */
 
+EXTERN char e_backslash_should_be_followed_by[]
+	INIT(= N_("E10: \\ should be followed by /, ? or &"));
+#ifdef FEAT_CMDWIN
+EXTERN char e_invalid_in_cmdline_window[]
+	INIT(= N_("E11: Invalid in command-line window; <CR> executes, CTRL-C quits"));
+#endif
+EXTERN char e_command_not_allowed_from_vimrc_in_current_dir_or_tag_search[]
+	INIT(= N_("E12: Command not allowed from exrc/vimrc in current dir or tag search"));
+EXTERN char e_file_exists[]
+	INIT(= N_("E13: File exists (add ! to override)"));
+#ifdef FEAT_EVAL
+EXTERN char e_invalid_expression_str[]
+	INIT(= N_("E15: Invalid expression: \"%s\""));
+#endif
+EXTERN char e_invalid_range[]
+	INIT(= N_("E16: Invalid range"));
+#if defined(UNIX) || defined(FEAT_SYN_HL) || defined(FEAT_SPELL)
+EXTERN char e_src_is_directory[]
+	INIT(= N_("E17: \"%s\" is a directory"));
+#endif
+#ifdef FEAT_EVAL
+EXTERN char e_unexpected_characters_in_let[]
+	INIT(= N_("E18: Unexpected characters in :let"));
+EXTERN char e_unexpected_characters_in_assignment[]
+	INIT(= N_("E18: Unexpected characters in assignment"));
+#endif
+EXTERN char e_mark_has_invalid_line_number[]
+	INIT(= N_("E19: Mark has invalid line number"));
+EXTERN char e_mark_not_set[]
+	INIT(= N_("E20: Mark not set"));
+EXTERN char e_cannot_make_changes_modifiable_is_off[]
+	INIT(= N_("E21: Cannot make changes, 'modifiable' is off"));
+EXTERN char e_scripts_nested_too_deep[]
+	INIT(= N_("E22: Scripts nested too deep"));
+EXTERN char e_no_alternate_file[]
+	INIT(= N_("E23: No alternate file"));
+EXTERN char e_no_such_abbreviation[]
+	INIT(= N_("E24: No such abbreviation"));
 #ifdef FEAT_EVAL
 EXTERN char e_undefined_variable_str[]
 	INIT(= N_("E121: Undefined variable: %s"));
@@ -31,6 +69,8 @@ EXTERN char e_cannot_slice_dictionary[]
 	INIT(= N_("E719: Cannot slice a Dictionary"));
 EXTERN char e_assert_fails_second_arg[]
 	INIT(= N_("E856: \"assert_fails()\" second argument must be a string or a list with one or two strings"));
+EXTERN char e_using_invalid_value_as_string_str[]
+	INIT(= N_("E908: using an invalid value as a String: %s"));
 EXTERN char e_cannot_index_special_variable[]
 	INIT(= N_("E909: Cannot index a special variable"));
 #endif
@@ -147,7 +187,7 @@ EXTERN char e_cannot_declare_an_option[]
 	INIT(= N_("E1052: Cannot declare an option: %s"));
 EXTERN char e_could_not_import_str[]
 	INIT(= N_("E1053: Could not import \"%s\""));
-EXTERN char e_variable_already_declared_in_script[]
+EXTERN char e_variable_already_declared_in_script_str[]
 	INIT(= N_("E1054: Variable already declared in the script: %s"));
 EXTERN char e_missing_name_after_dots[]
 	INIT(= N_("E1055: Missing name after ..."));
@@ -316,15 +356,15 @@ EXTERN char e_using_bool_as_number[]
 EXTERN char e_missing_matching_bracket_after_dict_key[]
 	INIT(= N_("E1139: Missing matching bracket after dict key"));
 EXTERN char e_for_argument_must_be_sequence_of_lists[]
-	INIT(= N_("E1140: For argument must be a sequence of lists"));
+	INIT(= N_("E1140: :for argument must be a sequence of lists"));
 EXTERN char e_indexable_type_required[]
 	INIT(= N_("E1141: Indexable type required"));
 EXTERN char e_non_empty_string_required[]
 	INIT(= N_("E1142: Non-empty string required"));
 EXTERN char e_empty_expression_str[]
 	INIT(= N_("E1143: Empty expression: \"%s\""));
-EXTERN char e_command_not_followed_by_white_space_str[]
-	INIT(= N_("E1144: Command is not followed by white space: %s"));
+EXTERN char e_command_str_not_followed_by_white_space_str[]
+	INIT(= N_("E1144: Command \"%s\" is not followed by white space: %s"));
 EXTERN char e_missing_heredoc_end_marker_str[]
 	INIT(= N_("E1145: Missing heredoc end marker: %s"));
 EXTERN char e_command_not_recognized_str[]
@@ -365,3 +405,100 @@ EXTERN char e_variable_nr_type_mismatch_expected_str_but_got_str[]
 	INIT(= N_("E1163: Variable %d: type mismatch, expected %s but got %s"));
 EXTERN char e_vim9cmd_must_be_followed_by_command[]
 	INIT(= N_("E1164: vim9cmd must be followed by a command"));
+EXTERN char e_cannot_use_range_with_assignment_str[]
+	INIT(= N_("E1165: Cannot use a range with an assignment: %s"));
+EXTERN char e_cannot_use_range_with_dictionary[]
+	INIT(= N_("E1166: Cannot use a range with a dictionary"));
+EXTERN char e_argument_name_shadows_existing_variable_str[]
+	INIT(= N_("E1167: Argument name shadows existing variable: %s"));
+EXTERN char e_argument_already_declared_in_script_str[]
+	INIT(= N_("E1168: Argument already declared in the script: %s"));
+EXTERN char e_import_as_name_not_supported_here[]
+	INIT(= N_("E1169: 'import * as {name}' not supported here"));
+EXTERN char e_cannot_use_hash_curly_to_start_comment[]
+	INIT(= N_("E1170: Cannot use #{ to start a comment"));
+EXTERN char e_missing_end_block[]
+	INIT(= N_("E1171: Missing } after inline function"));
+EXTERN char e_cannot_use_default_values_in_lambda[]
+	INIT(= N_("E1172: Cannot use default values in a lambda"));
+EXTERN char e_text_found_after_enddef_str[]
+	INIT(= N_("E1173: Text found after enddef: %s"));
+EXTERN char e_string_required_for_argument_nr[]
+	INIT(= N_("E1174: String required for argument %d"));
+EXTERN char e_non_empty_string_required_for_argument_nr[]
+	INIT(= N_("E1175: Non-empty string required for argument %d"));
+EXTERN char e_misplaced_command_modifier[]
+	INIT(= N_("E1176: Misplaced command modifier"));
+EXTERN char e_for_loop_on_str_not_supported[]
+	INIT(= N_("E1177: For loop on %s not supported"));
+EXTERN char e_cannot_lock_unlock_local_variable[]
+	INIT(= N_("E1178: Cannot lock or unlock a local variable"));
+EXTERN char e_failed_to_extract_pwd_from_str_check_your_shell_config[]
+	INIT(= N_("E1179: Failed to extract PWD from %s, check your shell's config related to OSC 7"));
+EXTERN char e_variable_arguments_type_must_be_list_str[]
+	INIT(= N_("E1180: Variable arguments type must be a list: %s"));
+EXTERN char e_cannot_use_underscore_here[]
+	INIT(= N_("E1181: Cannot use an underscore here"));
+EXTERN char e_blob_required[]
+	INIT(= N_("E1182: Blob required"));
+EXTERN char e_cannot_use_range_with_assignment_operator_str[]
+	INIT(= N_("E1183: Cannot use a range with an assignment operator: %s"));
+EXTERN char e_blob_not_set[]
+	INIT(= N_("E1184: Blob not set"));
+EXTERN char e_cannot_nest_redir[]
+	INIT(= N_("E1185: Cannot nest :redir"));
+EXTERN char e_missing_redir_end[]
+	INIT(= N_("E1185: Missing :redir END"));
+EXTERN char e_expression_does_not_result_in_value_str[]
+	INIT(= N_("E1186: Expression does not result in a value: %s"));
+EXTERN char e_failed_to_source_defaults[]
+	INIT(= N_("E1187: Failed to source defaults.vim"));
+EXTERN char e_cannot_open_terminal_from_command_line_window[]
+	INIT(= N_("E1188: Cannot open a terminal from the command line window"));
+EXTERN char e_cannot_use_legacy_with_command_str[]
+	INIT(= N_("E1189: Cannot use :legacy with this command: %s"));
+EXTERN char e_one_argument_too_few[]
+	INIT(= N_("E1190: One argument too few"));
+EXTERN char e_nr_arguments_too_few[]
+	INIT(= N_("E1190: %d arguments too few"));
+EXTERN char e_call_to_function_that_failed_to_compile_str[]
+	INIT(= N_("E1191: Call to function that failed to compile: %s"));
+EXTERN char e_empty_function_name[]
+	INIT(= N_("E1192: Empty function name"));
+// libsodium
+EXTERN char e_libsodium_not_built_in[]
+	INIT(= N_("E1193: cryptmethod xchacha20 not built into this Vim"));
+EXTERN char e_libsodium_cannot_encrypt_header[]
+	INIT(= N_("E1194: Cannot encrypt header, not enough space"));
+EXTERN char e_libsodium_cannot_encrypt_buffer[]
+	INIT(= N_("E1195: Cannot encrypt buffer, not enough space"));
+EXTERN char e_libsodium_cannot_decrypt_header[]
+	INIT(= N_("E1196: Cannot decrypt header, not enough space"));
+EXTERN char e_libsodium_cannot_allocate_buffer[]
+	INIT(= N_("E1197: Cannot allocate_buffer for encryption"));
+EXTERN char e_libsodium_decryption_failed_header_incomplete[]
+	INIT(= N_("E1198: Decryption failed: Header incomplete!"));
+EXTERN char e_libsodium_cannot_decrypt_buffer[]
+	INIT(= N_("E1199: Cannot decrypt buffer, not enough space"));
+EXTERN char e_libsodium_decryption_failed[]
+	INIT(= N_("E1200: Decryption failed!"));
+EXTERN char e_libsodium_decryption_failed_premature[]
+	INIT(= N_("E1201: Decryption failed: pre-mature end of file!"));
+EXTERN char e_no_white_space_allowed_after_str_str[]
+	INIT(= N_("E1202: No white space allowed after '%s': %s"));
+EXTERN char e_dot_can_only_be_used_on_dictionary_str[]
+	INIT(= N_("E1203: Dot can only be used on a dictionary: %s"));
+EXTERN char e_regexp_number_after_dot_pos_search[]
+	INIT(= N_("E1204: No Number allowed after .: '\\%%%c'"));
+EXTERN char e_no_white_space_allowed_between_option_and[]
+	INIT(= N_("E1205: No white space allowed between option and"));
+EXTERN char e_dict_required_for_argument_nr[]
+	INIT(= N_("E1206: Dictionary required for argument %d"));
+EXTERN char e_expression_without_effect_str[]
+	INIT(= N_("E1207: Expression without an effect: %s"));
+EXTERN char e_complete_used_without_nargs[]
+	INIT(= N_("E1208: -complete used without -nargs"));
+EXTERN char e_invalid_value_for_line_number_str[]
+	INIT(= N_("E1209: Invalid value for a line number: \"%s\""));
+EXTERN char e_number_required_for_argument_nr[]
+	INIT(= N_("E1210: Number required for argument %d"));

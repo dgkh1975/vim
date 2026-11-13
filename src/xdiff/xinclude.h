@@ -25,7 +25,7 @@
 // defines HAVE_ATTRIBUTE_UNUSED
 #ifdef HAVE_CONFIG_H
 # ifdef VMS
-#  include "[.auto]config.h"
+#  include "config.h"
 # else
 #  include "../auto/config.h"
 # endif
@@ -33,7 +33,7 @@
 
 // Mark unused function arguments with UNUSED, so that gcc -Wunused-parameter
 // can be used to check for mistakes.
-#ifdef HAVE_ATTRIBUTE_UNUSED
+#if defined(HAVE_ATTRIBUTE_UNUSED) || defined(__MINGW32__)
 # define UNUSED __attribute__((unused))
 #else
 # define UNUSED
@@ -42,6 +42,9 @@
 #if defined(_MSC_VER)
 # define inline __inline
 #endif
+
+// Vim replacement for BUG()
+void xdl_bug(const char *msg);
 
 #if !defined(XINCLUDE_H)
 #define XINCLUDE_H

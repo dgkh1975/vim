@@ -1,8 +1,6 @@
 " Tests for digraphs
 
-source check.vim
 CheckFeature digraphs
-source term_util.vim
 
 func Put_Dig(chars)
   exe "norm! o\<c-k>".a:chars
@@ -37,6 +35,12 @@ func Test_digraphs()
   call Put_Dig("=P")
   call Put_Dig("P=")
   call assert_equal(['Р']+repeat(["₽"],2)+['П'], getline(line('.')-3,line('.')))
+  " Quadruple prime
+  call Put_Dig("'4")
+  call assert_equal("⁗", getline('.'))
+  " APPROACHES THE LIMIT
+  call Put_Dig(".=")
+  call assert_equal("≐", getline('.'))
   " Not a digraph
   call Put_Dig("a\<bs>")
   call Put_Dig("\<bs>a")
@@ -51,7 +55,7 @@ func Test_digraphs()
   call Put_Dig("'e")
   call Put_Dig("b'") " not defined
   call assert_equal(["á", "é", "'"], getline(line('.')-2,line('.')))
-  " Cicumflex
+  " Circumflex
   call Put_Dig("a>")
   call Put_Dig(">e")
   call Put_Dig("b>") " not defined
@@ -247,9 +251,12 @@ func Test_digraphs_option()
   call Put_Dig_BS("P","=")
   call assert_equal(['Р']+repeat(["₽"],2)+['П'], getline(line('.')-3,line('.')))
   " Not a digraph: this is different from <c-k>!
+  let _bs = &bs
+  set bs=
   call Put_Dig_BS("a","\<bs>")
   call Put_Dig_BS("\<bs>","a")
   call assert_equal(['','a'], getline(line('.')-1,line('.')))
+  let &bs = _bs
   " Grave
   call Put_Dig_BS("a","!")
   call Put_Dig_BS("!","e")
@@ -494,9 +501,17 @@ endfunc
 func Test_loadkeymap_error()
   CheckFeature keymap
   call assert_fails('loadkeymap', 'E105:')
-  call writefile(['loadkeymap', 'a'], 'Xkeymap')
+  call writefile(['loadkeymap', 'a'], 'Xkeymap', 'D')
   call assert_fails('source Xkeymap', 'E791:')
-  call delete('Xkeymap')
+endfunc
+
+" Test for ":loadkeymap" in a block that is not executed: it reads the rest of
+" the script, so that rest, the "endif" with it, is thrown away instead of
+" being read as commands.
+func Test_loadkeymap_skipped()
+  CheckFeature keymap
+  call writefile(['if 0', '  loadkeymap', '  a b', 'endif'], 'Xkeymap', 'D')
+  call assert_fails('source Xkeymap', 'E171:')
 endfunc
 
 " Test for the characters displayed on the screen when entering a digraph
@@ -504,14 +519,11 @@ func Test_entering_digraph()
   CheckRunVimInTerminal
   let buf = RunVimInTerminal('', {'rows': 6})
   call term_sendkeys(buf, "i\<C-K>")
-  call TermWait(buf)
-  call assert_equal('?', term_getline(buf, 1))
+  call WaitForAssert({-> assert_equal('?', term_getline(buf, 1))}, 1000)
   call term_sendkeys(buf, "1")
-  call TermWait(buf)
-  call assert_equal('1', term_getline(buf, 1))
+  call WaitForAssert({-> assert_equal('1', term_getline(buf, 1))}, 1000)
   call term_sendkeys(buf, "2")
-  call TermWait(buf)
-  call assert_equal('½', term_getline(buf, 1))
+  call WaitForAssert({-> assert_equal('½', term_getline(buf, 1))}, 1000)
   call StopVimInTerminal(buf)
 endfunc
 
@@ -593,16 +605,29 @@ func Test_digraph_getlist_function()
   call digraph_setlist([['aa', 'き'], ['bb', 'く']])
 
   for pair in digraph_getlist(1)
-    call assert_equal(digraph_get(pair[0]), pair[1])
+    call assert_equal(pair[1], digraph_get(pair[0]))
   endfor
 
   " We don't know how many digraphs are registered before, so check the number
   " of digraphs returned.
   call assert_equal(digraph_getlist()->len(), digraph_getlist(0)->len())
-  call assert_notequal((digraph_getlist()->len()), digraph_getlist(1)->len())
+  call assert_notequal(digraph_getlist()->len(), digraph_getlist(1)->len())
+  call assert_equal(digraph_getlist()->len(), digraph_getlist(v:false)->len())
+  call assert_notequal(digraph_getlist()->len(), digraph_getlist(v:true)->len())
 
-  call assert_fails('call digraph_getlist(0z12)', 'E974: Using a Blob as a Number')
+  call assert_fails('call digraph_getlist(0z12)', 'E1212: Bool required for argument 1')
 endfunc
 
+func Test_digraph_angle_bracket_patch()
+  " Ensure that the deprecated angle brackets 2329/232A ('</','/>') are not used
+  call assert_notequal('〈', digraph_get('</'))
+  call assert_notequal('〉', digraph_get('/>'))
+  " Ensure that the CJK angle brackets 3008/3009 ('</','/>') are used
+  call assert_equal('〈', digraph_get('</'))
+  call assert_equal('〉', digraph_get('/>'))
+  " Ensure that the mathematical angle brackets 27E8/27E9 ('<[',']>') are defined
+  call assert_equal('⟨', digraph_get('<['))
+  call assert_equal('⟩', digraph_get(']>'))
+endfunc
 
 " vim: shiftwidth=2 sts=2 expandtab

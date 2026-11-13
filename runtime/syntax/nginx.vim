@@ -1,7 +1,7 @@
 " Vim syntax file
 " Language: nginx.conf
 " Maintainer: Chris Aumann <me@chr4.org>
-" Last Change: Apr 15, 2017
+" Last Change: Aug 31, 2026
 
 if exists("b:current_syntax")
   finish
@@ -30,8 +30,7 @@ syn match ngxIPaddr '\[\(\x\{1,4}:\)\{5}:\(\(\x\{1,4}:\)\{,1}\x\{1,4}\|\([0-2]\?
 syn match ngxIPaddr '\[\(\x\{1,4}:\)\{6}:\x\{1,4}\]'
 
 " Highlight wildcard listening signs also as IPaddr
-syn match ngxIPaddr '\s\zs\[::]'
-syn match ngxIPaddr '\s\zs\*'
+syn match ngxIPaddr '\s\zs\%(\[::]\|\*\)'
 
 syn keyword ngxBoolean on
 syn keyword ngxBoolean off
@@ -84,6 +83,8 @@ syn keyword ngxListenOptions default_server contained
 syn keyword ngxListenOptions ssl            contained
 syn keyword ngxListenOptions http2          contained
 syn keyword ngxListenOptions spdy           contained
+syn keyword ngxListenOptions http3          contained
+syn keyword ngxListenOptions quic           contained
 syn keyword ngxListenOptions proxy_protocol contained
 syn keyword ngxListenOptions setfib         contained
 syn keyword ngxListenOptions fastopen       contained
@@ -258,6 +259,7 @@ syn keyword ngxDirective hls_forward_args
 syn keyword ngxDirective hls_fragment
 syn keyword ngxDirective hls_mp4_buffer_size
 syn keyword ngxDirective hls_mp4_max_buffer_size
+syn keyword ngxDirective http2
 syn keyword ngxDirective http2_chunk_size
 syn keyword ngxDirective http2_body_preread_size
 syn keyword ngxDirective http2_idle_timeout
@@ -265,8 +267,17 @@ syn keyword ngxDirective http2_max_concurrent_streams
 syn keyword ngxDirective http2_max_field_size
 syn keyword ngxDirective http2_max_header_size
 syn keyword ngxDirective http2_max_requests
+syn keyword ngxDirective http2_push
+syn keyword ngxDirective http2_push_preload
 syn keyword ngxDirective http2_recv_buffer_size
 syn keyword ngxDirective http2_recv_timeout
+syn keyword ngxDirective http3
+syn keyword ngxDirective http3_hq
+syn keyword ngxDirective http3_max_concurrent_pushes
+syn keyword ngxDirective http3_max_concurrent_streams
+syn keyword ngxDirective http3_push
+syn keyword ngxDirective http3_push_preload
+syn keyword ngxDirective http3_stream_buffer_size
 syn keyword ngxDirective if_modified_since
 syn keyword ngxDirective ignore_invalid_headers
 syn keyword ngxDirective image_filter
@@ -444,6 +455,10 @@ syn keyword ngxDirective proxy_temp_path
 syn keyword ngxDirective proxy_timeout
 syn keyword ngxDirective proxy_upload_rate
 syn keyword ngxDirective queue
+syn keyword ngxDirective quic_gso
+syn keyword ngxDirective quic_host_key
+syn keyword ngxDirective quic_mtu
+syn keyword ngxDirective quic_retry
 syn keyword ngxDirective random_index
 syn keyword ngxDirective read_ahead
 syn keyword ngxDirective real_ip_header
@@ -545,8 +560,10 @@ syn keyword ngxDirective ssl_certificate
 syn keyword ngxDirective ssl_certificate_key
 syn keyword ngxDirective ssl_ciphers
 syn keyword ngxDirective ssl_client_certificate
+syn keyword ngxDirective ssl_conf_command
 syn keyword ngxDirective ssl_crl
 syn keyword ngxDirective ssl_dhparam
+syn keyword ngxDirective ssl_early_data
 syn keyword ngxDirective ssl_ecdh_curve
 syn keyword ngxDirective ssl_engine
 syn keyword ngxDirective ssl_handshake_timeout
@@ -556,17 +573,14 @@ syn keyword ngxSSLPreferServerCiphersOn on contained
 syn keyword ngxSSLPreferServerCiphersOff off contained
 syn keyword ngxDirective ssl_preread
 syn keyword ngxDirective ssl_protocols nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
-syn match ngxSSLProtocol 'TLSv1' contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
-syn match ngxSSLProtocol 'TLSv1\.1' contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
-syn match ngxSSLProtocol 'TLSv1\.2' contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
-syn match ngxSSLProtocol 'TLSv1\.3' contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
+syn keyword ngxDirective ssl_reject_handshake
+syn match ngxSSLProtocol 'TLSv1\%(\.[123]\)\?' contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
 
 " Do not enable highlighting of insecure protocols if sslecure is loaded
 if !exists('g:loaded_sslsecure')
   syn keyword ngxSSLProtocolDeprecated SSLv2 SSLv3 contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
 else
-  syn match ngxSSLProtocol 'SSLv2' contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
-  syn match ngxSSLProtocol 'SSLv3' contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
+  syn match ngxSSLProtocol 'SSLv[23]' contained nextgroup=ngxSSLProtocol,ngxSSLProtocolDeprecated skipwhite
 endif
 
 syn keyword ngxDirective ssl_session_cache
@@ -622,6 +636,7 @@ syn keyword ngxDirective uwsgi_buffering
 syn keyword ngxDirective uwsgi_buffers
 syn keyword ngxDirective uwsgi_busy_buffers_size
 syn keyword ngxDirective uwsgi_cache
+syn keyword ngxDirective uwsgi_cache_background_update
 syn keyword ngxDirective uwsgi_cache_bypass
 syn keyword ngxDirective uwsgi_cache_key
 syn keyword ngxDirective uwsgi_cache_lock
@@ -699,46 +714,20 @@ syn keyword ngxDirective zone
 if !exists('g:loaded_sslsecure')
   " Mark insecure SSL Ciphers (Note: List might not not complete)
   " Reference: https://www.openssl.org/docs/man1.0.2/apps/ciphers.html
-  syn match ngxSSLCipherInsecure '[^!]\zsSSLv3'
-  syn match ngxSSLCipherInsecure '[^!]\zsSSLv2'
-  syn match ngxSSLCipherInsecure '[^!]\zsHIGH'
-  syn match ngxSSLCipherInsecure '[^!]\zsMEDIUM'
-  syn match ngxSSLCipherInsecure '[^!]\zsLOW'
-  syn match ngxSSLCipherInsecure '[^!]\zsDEFAULT'
-  syn match ngxSSLCipherInsecure '[^!]\zsCOMPLEMENTOFDEFAULT'
-  syn match ngxSSLCipherInsecure '[^!]\zsALL'
-  syn match ngxSSLCipherInsecure '[^!]\zsCOMPLEMENTOFALL'
-
   " SHA ciphers are only used in HMAC with all known OpenSSL/ LibreSSL cipher suites and MAC
-  " usage is still considered safe
-  " syn match ngxSSLCipherInsecure '[^!]\zsSHA\ze\D'      " Match SHA1 without matching SHA256+
-  " syn match ngxSSLCipherInsecure '[^!]\zsSHA1'
-  syn match ngxSSLCipherInsecure '[^!]\zsMD5'
-  syn match ngxSSLCipherInsecure '[^!]\zsRC2'
-  syn match ngxSSLCipherInsecure '[^!]\zsRC4'
-  syn match ngxSSLCipherInsecure '[^!]\zs3DES'
+  " usage is still considered safe, so SHA/SHA1 are intentionally not matched.
+  " The ciphers sharing the common '[^!]\zs' prefix are merged into a single
+  " alternation for performance (one match rule instead of dozens).
+  syn match ngxSSLCipherInsecure '[^!]\zs\%(SSLv[23]\|COMPLEMENTOFDEFAULT\|COMPLEMENTOFALL\|DEFAULT\|MEDIUM\|HIGH\|LOW\|ALL\|MD5\|RC[24]\|3DES\|aDSS\|PSK\|IDEA\|SEED\|EXP\w*\|[ak]GOST\w*\|[kae]\?FZA\|ECB\|[aes]NULL\|ADH\|kDHE\|kEDH\|kECDHE\|kEECDH\)'
+
+  " These need a different preceding-character constraint, so keep them separate.
   syn match ngxSSLCipherInsecure '[^!3]\zsDES'
-  syn match ngxSSLCipherInsecure '[^!]\zsaDSS'
   syn match ngxSSLCipherInsecure '[^!a]\zsDSS'
-  syn match ngxSSLCipherInsecure '[^!]\zsPSK'
-  syn match ngxSSLCipherInsecure '[^!]\zsIDEA'
-  syn match ngxSSLCipherInsecure '[^!]\zsSEED'
-  syn match ngxSSLCipherInsecure '[^!]\zsEXP\w*'        " Match all EXPORT ciphers
-  syn match ngxSSLCipherInsecure '[^!]\zsaGOST\w*'      " Match all GOST ciphers
-  syn match ngxSSLCipherInsecure '[^!]\zskGOST\w*'
   syn match ngxSSLCipherInsecure '[^!ak]\zsGOST\w*'
-  syn match ngxSSLCipherInsecure '[^!]\zs[kae]\?FZA'    " Not implemented
-  syn match ngxSSLCipherInsecure '[^!]\zsECB'
-  syn match ngxSSLCipherInsecure '[^!]\zs[aes]NULL'
 
   " Anonymous cipher suites should never be used
   syn match ngxSSLCipherInsecure '[^!ECa]\zsDH\ze[^E]'  " Try to match DH without DHE, EDH, EECDH, etc.
   syn match ngxSSLCipherInsecure '[^!EA]\zsECDH\ze[^E]' " Do not match EECDH, ECDHE
-  syn match ngxSSLCipherInsecure '[^!]\zsADH'
-  syn match ngxSSLCipherInsecure '[^!]\zskDHE'
-  syn match ngxSSLCipherInsecure '[^!]\zskEDH'
-  syn match ngxSSLCipherInsecure '[^!]\zskECDHE'
-  syn match ngxSSLCipherInsecure '[^!]\zskEECDH'
   syn match ngxSSLCipherInsecure '[^!E]\zsAECDH'
 endif
 
@@ -2225,6 +2214,19 @@ syn keyword ngxDirectiveThirdParty xss_override_status
 syn keyword ngxDirectiveThirdParty xss_check_status
 syn keyword ngxDirectiveThirdParty xss_input_types
 
+" CT Module <https://github.com/grahamedgecombe/nginx-ct>
+" Certificate Transparency module for nginx
+syn keyword ngxDirectiveThirdParty ssl_ct
+syn keyword ngxDirectiveThirdParty ssl_ct_static_scts
+
+" Dynamic TLS records patch <https://github.com/cloudflare/sslconfig/blob/master/patches/nginx__dynamic_tls_records.patch>
+" TLS Dynamic Record Resizing
+syn keyword ngxDirectiveThirdParty ssl_dyn_rec_enable
+syn keyword ngxDirectiveThirdParty ssl_dyn_rec_size_hi
+syn keyword ngxDirectiveThirdParty ssl_dyn_rec_size_lo
+syn keyword ngxDirectiveThirdParty ssl_dyn_rec_threshold
+syn keyword ngxDirectiveThirdParty ssl_dyn_rec_timeout
+
 " ZIP Module <https://www.nginx.com/resources/wiki/modules/zip/>
 " ZIP archiver for nginx
 
@@ -2267,7 +2269,7 @@ let b:current_syntax = "nginx"
 " Enable nested LUA syntax highlighting
 unlet b:current_syntax
 syn include @LUA syntax/lua.vim
-syn region ngxLua start=+^\s*\w\+_by_lua_block\s*{+ end=+}+me=s-1 contains=ngxBlock,@LUA
+syn region ngxLua start=+^\s*\w\+_by_lua_block\s*\(\$\w\+\s*\)\?{+ end=+}+me=s-1 contains=ngxBlock,@LUA
 let b:current_syntax = "nginx"
 
 
